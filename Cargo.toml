@@ -1,0 +1,13 @@
+[package]
+name = "shuck-lsp"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Shuck language server integration for Zed"
+repository = "https://github.com/lurenyang418/zed-shuck"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+zed_extension_api = "0.7.0"

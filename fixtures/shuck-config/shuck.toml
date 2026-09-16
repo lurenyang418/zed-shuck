@@ -1,0 +1,6 @@
+[lint]
+lint-sources = true
+
+[format]
+indent-style = "space"
+indent-width = 2

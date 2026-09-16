@@ -1,0 +1,14 @@
+id = "shuck-lsp"
+name = "Shuck"
+version = "0.1.0"
+schema_version = 1
+authors = ["Shuck Contributors"]
+description = "Lint and format shell scripts with Shuck."
+repository = "https://github.com/lurenyang418/zed-shuck"
+
+[language_servers.shuck]
+name = "Shuck"
+languages = ["Shell Script"]
+
+[language_servers.shuck.language_ids]
+"Shell Script" = "shellscript"

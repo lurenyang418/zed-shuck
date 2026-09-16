@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    name: Check extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      - name: Validate extension manifest
+        run: python3 -c 'import tomllib; from pathlib import Path; data = tomllib.loads(Path("extension.toml").read_text()); required = {"id", "name", "version", "schema_version", "description", "repository"}; missing = required.difference(data); assert not missing, f"missing manifest keys: {sorted(missing)}"; assert data["language_servers"]["shuck"]["languages"] == ["Shell Script"]; print("manifest valid")'
+      - run: cargo fmt --check
+      - run: cargo test
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo build --release --target wasm32-wasip2
