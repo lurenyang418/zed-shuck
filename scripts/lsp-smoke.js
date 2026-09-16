@@ -67,6 +67,46 @@ function waitFor(predicate, timeoutMs = 5000) {
   });
 }
 
+function offsetAtPosition(text, position) {
+  const lines = text.split("\n");
+  if (position.line >= lines.length) {
+    throw new Error(`LSP edit line is out of bounds: ${position.line}`);
+  }
+
+  return (
+    lines.slice(0, position.line).reduce((offset, line) => offset + line.length + 1, 0) +
+    position.character
+  );
+}
+
+function applyTextEdits(text, edits) {
+  const editsWithOffsets = edits
+    .map((edit) => ({
+      start: offsetAtPosition(text, edit.range.start),
+      end: offsetAtPosition(text, edit.range.end),
+      newText: edit.newText,
+    }))
+    .sort((left, right) => right.start - left.start);
+
+  return editsWithOffsets.reduce(
+    (result, edit) => result.slice(0, edit.start) + edit.newText + result.slice(edit.end),
+    text,
+  );
+}
+
+function assertFormattedText(response, source, expected, description) {
+  if (!Array.isArray(response.result)) {
+    throw new Error(`Expected ${description} to return text edits; got ${JSON.stringify(response)}`);
+  }
+
+  const formatted = applyTextEdits(source, response.result);
+  if (formatted !== expected) {
+    throw new Error(
+      `Unexpected ${description} result; expected ${JSON.stringify(expected)}, got ${JSON.stringify(formatted)}`,
+    );
+  }
+}
+
 function reportServerError(error) {
   if (serverError) return;
   serverError = error instanceof Error ? error : new Error(String(error));
@@ -124,6 +164,19 @@ async function run() {
   const fixableText = fs.readFileSync(fixablePath, "utf8");
   const formatText = fs.readFileSync(formatPath, "utf8");
   const sourceText = fs.readFileSync(sourcePath, "utf8");
+  const expectedTwoSpaceFormat = [
+    "#!/usr/bin/env bash",
+    "",
+    "main() {",
+    '  echo "hello"',
+    "}",
+    "",
+    "main",
+  ].join("\n") + "\n";
+  const expectedFourSpaceFormat = expectedTwoSpaceFormat.replace(
+    '  echo "hello"',
+    '    echo "hello"',
+  );
 
   send(server, {
     jsonrpc: "2.0",
@@ -206,7 +259,7 @@ async function run() {
       message.params?.uri === fixableUri,
   );
   if (!fixableDiagnostics.params.diagnostics.length) {
-    throw new Error("Expected a safe-fix diagnostic for fixtures/fixable.sh");
+    throw new Error("Expected a fixable diagnostic for fixtures/fixable.sh");
   }
 
   send(server, {
@@ -257,12 +310,12 @@ async function run() {
     },
   });
   const formatting = await waitFor((message) => message.id === 2);
-  if (!Array.isArray(formatting.result) || !formatting.result.length) {
-    throw new Error("Expected formatting edits for fixtures/format.sh");
-  }
-  if (!formatting.result.some((edit) => edit.newText.includes("  ") && !edit.newText.includes("\t"))) {
-    throw new Error("Expected the fixture's two-space format configuration to be applied");
-  }
+  assertFormattedText(
+    formatting,
+    formatText,
+    expectedTwoSpaceFormat,
+    "two-space document formatting",
+  );
 
   send(server, {
     jsonrpc: "2.0",
@@ -281,11 +334,61 @@ async function run() {
   const rangeEditText = Array.isArray(rangeFormatting.result)
     ? rangeFormatting.result.map((edit) => edit.newText || "").join("")
     : "";
-  if (!rangeEditText.includes("  ")) {
+  if (!rangeEditText) {
     throw new Error(
-      `Expected range-formatting edits with two-space indentation; got ${JSON.stringify(rangeFormatting.result)}`,
+      `Expected range-formatting edits; got ${JSON.stringify(rangeFormatting.result)}`,
     );
   }
+  assertFormattedText(
+    rangeFormatting,
+    formatText,
+    expectedTwoSpaceFormat,
+    "two-space range formatting",
+  );
+
+  send(server, {
+    jsonrpc: "2.0",
+    method: "workspace/didChangeConfiguration",
+    params: { settings: { format: { "indent-width": 4 } } },
+  });
+  send(server, {
+    jsonrpc: "2.0",
+    id: 10,
+    method: "textDocument/formatting",
+    params: {
+      textDocument: { uri: formatUri },
+      options: { tabSize: 4, insertSpaces: true },
+    },
+  });
+  const reconfiguredFormatting = await waitFor((message) => message.id === 10);
+  assertFormattedText(
+    reconfiguredFormatting,
+    formatText,
+    expectedFourSpaceFormat,
+    "four-space formatting after didChangeConfiguration",
+  );
+
+  send(server, {
+    jsonrpc: "2.0",
+    method: "workspace/didChangeConfiguration",
+    params: { settings: {} },
+  });
+  send(server, {
+    jsonrpc: "2.0",
+    id: 11,
+    method: "textDocument/formatting",
+    params: {
+      textDocument: { uri: formatUri },
+      options: { tabSize: 2, insertSpaces: true },
+    },
+  });
+  const restoredFormatting = await waitFor((message) => message.id === 11);
+  assertFormattedText(
+    restoredFormatting,
+    formatText,
+    expectedTwoSpaceFormat,
+    "two-space formatting after configuration reset",
+  );
 
   send(server, {
     jsonrpc: "2.0",
@@ -362,7 +465,7 @@ async function run() {
   server.stdin.end();
 
   console.log(
-    "LSP smoke passed: diagnostics, quick fixes, source.fixAll, formatting, and source navigation are available",
+    "LSP smoke passed: diagnostics, quick fixes, source.fixAll, formatting, configuration refresh, and source navigation are available",
   );
 }
 

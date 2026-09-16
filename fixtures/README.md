@@ -12,6 +12,8 @@ These files exercise the native Shuck language server used by the extension:
 
 These fixtures verify the two supported configuration filenames independently; they do not test precedence between conflicting configuration files in the same directory.
 
+The protocol smoke test also changes `format.indent-width` through `workspace/didChangeConfiguration` and checks that formatting changes to four spaces before restoring the project configuration.
+
 Run the protocol smoke test from the repository root:
 
 ```sh

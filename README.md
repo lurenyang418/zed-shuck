@@ -62,7 +62,7 @@ node scripts/lsp-smoke.js
 shuck format --diff fixtures/shuck-config/format.sh
 ```
 
-The smoke test requires a local `shuck` executable and verifies the native server's advertised diagnostics/formatting capabilities, a real diagnostic, quick fixes, `source.fixAll.shuck`, source navigation, and formatting edits. The final command exercises the equivalent `shuck.toml` configuration filename; exit status 1 is expected because `--diff` reports the pending formatting change. Load the repository through Zed's **Install Dev Extension** action to test the same integration from the editor.
+The smoke test requires a local `shuck` executable and verifies the native server's advertised diagnostics/formatting capabilities, a real diagnostic, quick fixes, `source.fixAll.shuck`, source navigation, configuration refresh, and exact formatting results. The final command exercises the equivalent `shuck.toml` configuration filename; exit status 1 is expected because `--diff` reports the pending formatting change. Load the repository through Zed's **Install Dev Extension** action to test the same integration from the editor.
 
 ## License
 
