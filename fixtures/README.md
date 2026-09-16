@@ -3,6 +3,7 @@
 These files exercise the native Shuck language server used by the extension:
 
 - `diagnostics.sh` intentionally contains an unclosed `if` block and exercises quick fixes.
+- `fixable.sh` contains an unused-assignment fix and exercises `source.fixAll.shuck` with unsafe fixes enabled by the smoke client.
 - `format.sh` is valid but intentionally under-indented.
 - `posix.sh` and `zsh.zsh` cover the initial shell dialects.
 - `source/main.sh` and `source/lib.sh` cover source navigation fixtures.

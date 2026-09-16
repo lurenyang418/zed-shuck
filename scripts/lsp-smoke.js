@@ -111,14 +111,17 @@ server.stderr.on("data", (chunk) => {
 
 async function run() {
   const diagnosticsPath = path.join(root, "diagnostics.sh");
+  const fixablePath = path.join(root, "fixable.sh");
   const formatPath = path.join(root, "format.sh");
   const sourcePath = path.join(root, "source", "main.sh");
   const libraryPath = path.join(root, "source", "lib.sh");
   const diagnosticsUri = pathToFileURL(diagnosticsPath).href;
+  const fixableUri = pathToFileURL(fixablePath).href;
   const formatUri = pathToFileURL(formatPath).href;
   const sourceUri = pathToFileURL(sourcePath).href;
   const libraryUri = pathToFileURL(libraryPath).href;
   const diagnosticsText = fs.readFileSync(diagnosticsPath, "utf8");
+  const fixableText = fs.readFileSync(fixablePath, "utf8");
   const formatText = fs.readFileSync(formatPath, "utf8");
   const sourceText = fs.readFileSync(sourcePath, "utf8");
 
@@ -129,6 +132,7 @@ async function run() {
     params: {
       processId: process.pid,
       rootUri: pathToFileURL(`${root}${path.sep}`).href,
+      initializationOptions: { unsafeFixes: true },
       capabilities: {},
     },
   });
@@ -182,6 +186,53 @@ async function run() {
   const codeActions = await waitFor((message) => message.id === 7);
   if (!Array.isArray(codeActions.result) || !codeActions.result.length) {
     throw new Error("Expected quick-fix code actions for fixtures/diagnostics.sh");
+  }
+
+  send(server, {
+    jsonrpc: "2.0",
+    method: "textDocument/didOpen",
+    params: {
+      textDocument: {
+        uri: fixableUri,
+        languageId: shellScriptLanguageId,
+        version: 1,
+        text: fixableText,
+      },
+    },
+  });
+  const fixableDiagnostics = await waitFor(
+    (message) =>
+      message.method === "textDocument/publishDiagnostics" &&
+      message.params?.uri === fixableUri,
+  );
+  if (!fixableDiagnostics.params.diagnostics.length) {
+    throw new Error("Expected a safe-fix diagnostic for fixtures/fixable.sh");
+  }
+
+  send(server, {
+    jsonrpc: "2.0",
+    id: 8,
+    method: "textDocument/codeAction",
+    params: {
+      textDocument: { uri: fixableUri },
+      range: {
+        start: { line: 2, character: 0 },
+        end: { line: 2, character: 5 },
+      },
+      context: {
+        diagnostics: fixableDiagnostics.params.diagnostics,
+        only: ["source.fixAll.shuck"],
+      },
+    },
+  });
+  const sourceFixAll = await waitFor((message) => message.id === 8);
+  if (
+    !Array.isArray(sourceFixAll.result) ||
+    !sourceFixAll.result.some((action) => action.kind === "source.fixAll.shuck")
+  ) {
+    throw new Error(
+      `Expected source.fixAll.shuck code actions for fixtures/fixable.sh; got ${JSON.stringify(sourceFixAll)}`,
+    );
   }
 
   send(server, {
@@ -284,12 +335,35 @@ async function run() {
     throw new Error("Expected a definition in the sourced library");
   }
 
+  send(server, {
+    jsonrpc: "2.0",
+    id: 9,
+    method: "textDocument/references",
+    params: {
+      textDocument: { uri: sourceUri },
+      position: { line: 4, character: 1 },
+      context: { includeDeclaration: true },
+    },
+  });
+  const references = await waitFor((message) => message.id === 9);
+  if (
+    !Array.isArray(references.result) ||
+    !references.result.some((location) => location.uri === sourceUri) ||
+    !references.result.some((location) => location.uri === libraryUri)
+  ) {
+    throw new Error(
+      `Expected references for the sourced greet function; got ${JSON.stringify(references.result)}`,
+    );
+  }
+
   send(server, { jsonrpc: "2.0", id: 6, method: "shutdown", params: null });
   await waitFor((message) => message.id === 6);
   send(server, { jsonrpc: "2.0", method: "exit", params: null });
   server.stdin.end();
 
-  console.log("LSP smoke passed: diagnostics, code actions, formatting, and source navigation are available");
+  console.log(
+    "LSP smoke passed: diagnostics, quick fixes, source.fixAll, formatting, and source navigation are available",
+  );
 }
 
 async function stopServer() {
