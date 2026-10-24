@@ -2,7 +2,7 @@
 
 [Shuck](https://github.com/ewhauser/shuck) provides linting and formatting for shell scripts through its native language server. This extension connects Zed's `Shell Script` language to `shuck server` over stdio.
 
-The MVP is tested against Shuck `v0.2.2`. Keep the installed binary on a compatible release when upgrading the extension.
+The CI compatibility baseline is Shuck `v0.2.7`. Keep the installed binary on a compatible release when upgrading the extension.
 
 ## Requirements
 
@@ -59,7 +59,7 @@ cargo test
 cargo clippy --all-targets -- -D warnings
 cargo build --release --target wasm32-wasip2
 node scripts/lsp-smoke.js
-shuck format --diff fixtures/shuck-config/format.sh
+SHUCK_EXPERIMENTAL=1 shuck format --diff fixtures/shuck-config/format.sh
 ```
 
 The smoke test requires a local `shuck` executable and verifies the native server's advertised diagnostics/formatting capabilities, a real diagnostic, quick fixes, `source.fixAll.shuck`, source navigation, configuration refresh, and exact formatting results. The final command exercises the equivalent `shuck.toml` configuration filename; exit status 1 is expected because `--diff` reports the pending formatting change. Load the repository through Zed's **Install Dev Extension** action to test the same integration from the editor.

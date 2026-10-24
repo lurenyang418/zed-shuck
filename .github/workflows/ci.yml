@@ -26,9 +26,9 @@ jobs:
             ${{ runner.os }}-cargo-
       - name: Install pinned Shuck
         env:
-          SHUCK_VERSION: "0.2.2"
+          SHUCK_VERSION: "0.2.7"
           SHUCK_ASSET: shuck-cli-x86_64-unknown-linux-gnu.tar.xz
-          SHUCK_SHA256: 07c6ccd16424956c9782658639bf647010e765a6bc0359a96246c0f6dc049147
+          SHUCK_SHA256: 66db3daa642210657876c9f57bc69b76c4215d3e80cbee591ed729bfeb910215
         run: |
           set -euo pipefail
           install_root="$RUNNER_TEMP/shuck"
